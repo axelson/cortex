@@ -108,6 +108,14 @@ Then, to run cortex you would start `iex` with the following options:
 CORTEX_ENABLED=true iex -S mix
 ```
 
+## Configuring
+
+```ex
+config :cortex,
+  clear_before_running_tests: true
+```
+
+Set `clear_before_running_tests` to clear the screen immediately before running tests, defaults to true.
 
 ## Phoenix
 
