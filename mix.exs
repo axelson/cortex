@@ -5,7 +5,7 @@ defmodule Cortex.Mixfile do
     [
       app: :cortex,
       version: "0.5.0",
-      elixir: "~> 1.4",
+      elixir: "~> 1.7",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
       source_url: "https://github.com/urbint/cortex",
