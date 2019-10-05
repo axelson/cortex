@@ -2,6 +2,7 @@ defmodule Cortex.TestRunner do
   @moduledoc false
   use GenServer
 
+  alias Cortex.Focus
   alias Cortex.Reloader
 
   @behaviour Cortex.Controller.Stage
@@ -42,7 +43,7 @@ defmodule Cortex.TestRunner do
     end
   end
 
-  @spec run_tests_for_file(Path.t(), Cortex.Controller.focus(), keyword) ::
+  @spec run_tests_for_file(Path.t(), Cortex.Focus.t(), keyword) ::
           :ok | {:error, String.t()}
   def run_tests_for_file(path, focus, opts \\ []) do
     GenServer.call(__MODULE__, {:run_tests_for_file, path, focus, opts}, :infinity)
@@ -84,18 +85,37 @@ defmodule Cortex.TestRunner do
 
   @impl GenServer
   def handle_call({:run_tests_for_file, path, focus, _opts}, _from, state) do
-    case test_file_for_path(path) do
-      :not_found ->
-        {:reply, :ok, state}
+    if focus.path do
+      case run_test_files([focus.path], focus) do
+        :ok ->
+          {:reply, :ok, state}
 
-      test_path ->
-        case run_test_files([test_path], focus) do
-          :ok ->
-            {:reply, :ok, state}
+        err = {:error, _} ->
+          {:reply, err, state}
+      end
+    else
+      case test_file_for_path(path) do
+        :not_found ->
+          case focus do
+            %Focus{path: nil, line: nil, regex: nil} ->
+              case run_test_files() do
+                :ok ->
+                  {:reply, :ok, state}
 
-          err = {:error, _} ->
-            {:reply, err, state}
-        end
+                err = {:error, _} ->
+                  {:reply, err, state}
+              end
+          end
+
+        test_path ->
+          case run_test_files([test_path], focus) do
+            :ok ->
+              {:reply, :ok, state}
+
+            err = {:error, _} ->
+              {:reply, err, state}
+          end
+      end
     end
   end
 
@@ -114,16 +134,16 @@ defmodule Cortex.TestRunner do
   # Private helpers
   ################################################################################
 
-  defp apply_focus(nil), do: :ok
-  defp apply_focus([]), do: :ok
-
-  defp apply_focus(focus),
-    do: ExUnit.configure(exclude: [:test], include: focus)
+  defp apply_focus(focus) do
+    exunit_config = Focus.to_exunit_config(focus)
+    ExUnit.configure(exunit_config)
+  end
 
   defp clear_focus,
     do: ExUnit.configure(exclude: [], include: [])
 
-  defp run_test_files, do: run_test_files(all_test_files(), nil)
+  defp run_test_files, do: run_test_files(all_test_files(), Focus.new())
+
   defp run_test_files([], _), do: :ok
 
   defp run_test_files(files, focus) do
@@ -136,13 +156,13 @@ defmodule Cortex.TestRunner do
     end)
   end
 
-  @spec run_test_files(Path.t(), [Path.t()], Cortex.Controller.focus()) :: :ok | {:error, [any]}
+  @spec run_test_files(Path.t(), [Path.t()], Focus.t()) :: :ok | {:error, [any]}
   defp run_test_files(_test_helper, [], _), do: :ok
 
   defp run_test_files(test_helper, files, focus) do
     # Need to do this before loading test_helper so that user test configuration overrides it if
     # present
-    if focus == nil, do: clear_focus()
+    if Focus.empty?(focus), do: clear_focus()
 
     if Application.get_env(:cortex, :clear_before_running_tests, true) do
       IEx.Helpers.clear()

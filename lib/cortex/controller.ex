@@ -7,12 +7,6 @@ defmodule Cortex.Controller do
   alias Cortex.{Reloader, TestRunner}
 
   ##########################################
-  # Types
-  ##########################################
-
-  @type focus :: keyword | nil
-
-  ##########################################
   # Public API
   ##########################################
 
@@ -31,7 +25,7 @@ defmodule Cortex.Controller do
   ExUnit.
 
   """
-  @spec set_focus(focus) :: :ok
+  @spec set_focus(Cortex.Focus.t()) :: :ok
   def set_focus(focus),
     do: GenServer.call(__MODULE__, {:set_focus, focus})
 
@@ -40,7 +34,7 @@ defmodule Cortex.Controller do
 
   """
   @spec clear_focus() :: :ok
-  def clear_focus, do: set_focus(nil)
+  def clear_focus, do: set_focus(Cortex.Focus.new())
 
   ##########################################
   # GenServer Callbacks
@@ -54,7 +48,7 @@ defmodule Cortex.Controller do
         :test -> [Reloader, TestRunner]
       end
 
-    {:ok, %{pipeline: pipeline, focus: []}}
+    {:ok, %{pipeline: pipeline, focus: Cortex.Focus.new()}}
   end
 
   @impl GenServer
@@ -103,7 +97,7 @@ defmodule Cortex.Controller do
     and the second is the path of the file.
 
     """
-    @callback file_changed(atom, Path.t(), Cortex.Controller.focus()) :: result
+    @callback file_changed(atom, Path.t(), Cortex.Focus.t()) :: result
 
     @doc """
     Run this stage on all possible files
@@ -123,7 +117,7 @@ defmodule Cortex.Controller do
 
   @type command :: {:file, atom, Path.t()} | :all
 
-  @spec run_pipeline([module], command, focus) :: :ok | :error
+  @spec run_pipeline([module], command, Cortex.Focus.t()) :: :ok | :error
   def run_pipeline([], _command, _focus), do: :ok
 
   def run_pipeline([stage | rest], command, focus) do
@@ -140,7 +134,7 @@ defmodule Cortex.Controller do
     end
   end
 
-  @spec run_stage_command(module, command, focus) :: Stage.result()
+  @spec run_stage_command(module, command, Cortex.Focus.t()) :: Stage.result()
   defp run_stage_command(stage, {:file, type, path}, focus) do
     stage.file_changed(type, path, focus)
   end

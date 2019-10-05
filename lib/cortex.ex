@@ -59,17 +59,38 @@ defmodule Cortex do
   - a keyword, which will pass through to `ExUnit.configure/1` unchanged
 
   """
-  def focus(%Regex{} = re),
-    do: Cortex.Controller.set_focus(test: re)
+  def focus(%Regex{} = regex),
+    do: Cortex.Controller.set_focus(%Cortex.Focus{regex: regex})
 
   def focus(string) when is_binary(string),
     do: string |> Regex.compile!() |> focus()
 
   def focus(integer) when is_integer(integer),
-    do: Cortex.Controller.set_focus(line: integer)
+    do: Cortex.Controller.set_focus(%Cortex.Focus{line: integer})
 
   def focus(focus),
     do: Cortex.Controller.set_focus(focus)
+
+  @doc """
+  Expected input: "mix test test/validators/character_set_validator_test.exs:16"
+  path test/validators/character_set_validator_test.exs
+  Excluding tags: [:test]
+  Including tags: [line: "16"]
+  """
+  def focus_line(focus) do
+    case focus do
+      "mix test " <> path_and_line ->
+        [path, line_spec] = String.split(path_and_line, ":")
+        {line_number, _} = Integer.parse(line_spec)
+
+        focus = %Cortex.Focus{
+          path: path,
+          line: line_number
+        }
+
+        Cortex.Controller.set_focus(focus)
+    end
+  end
 
   @doc """
   Clear the focus for all Cortex stages.
